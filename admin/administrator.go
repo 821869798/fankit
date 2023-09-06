@@ -8,6 +8,10 @@ func IsAdministrator() bool {
 	return false
 }
 
-func RunAsAdministrator(exeFile string, exeArg []string) error {
-	return errors.New("not supported run as administrator on this platform")
+func StartRunAdministrator(exeFile string, exeArg []string) error {
+	return errors.New("not supported start run exe administrator on this platform")
+}
+
+func WaitRunAdministrator(exeFile string, exeArg []string) ([]byte, error) {
+	return errors.New("not supported start run exe administrator on this platform")
 }

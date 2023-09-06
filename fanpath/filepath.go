@@ -8,15 +8,27 @@ import (
 	"strings"
 )
 
-var executeDir string
+var (
+	executeDir  string
+	exeFilePath string
+)
 
 func InitExecutePath() error {
-	exePath, err := os.Executable()
+	p, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	executeDir = filepath.Dir(exePath)
+	exeFilePath = p
+	executeDir = filepath.Dir(exeFilePath)
 	return nil
+}
+
+func ExecuteFilePath() string {
+	return exeFilePath
+}
+
+func ExecuteParentPath() string {
+	return executeDir
 }
 
 // RelExecuteDir 获取相对可执行文件所在目录
