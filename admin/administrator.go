@@ -13,5 +13,5 @@ func StartRunAdministrator(exeFile string, exeArg []string) error {
 }
 
 func WaitRunAdministrator(exeFile string, exeArg []string) ([]byte, error) {
-	return errors.New("not supported start run exe administrator on this platform")
+	return nil, errors.New("not supported start run exe administrator on this platform")
 }
