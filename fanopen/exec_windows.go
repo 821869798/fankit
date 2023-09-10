@@ -1,6 +1,6 @@
 //go:build windows
 
-package open
+package fanopen
 
 import (
 	"os"

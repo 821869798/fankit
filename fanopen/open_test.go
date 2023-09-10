@@ -1,4 +1,4 @@
-package open
+package fanopen
 
 import "testing"
 
@@ -7,7 +7,7 @@ func TestRun(t *testing.T) {
 	input := "https://google.com/"
 	err := Run(input)
 	if err != nil {
-		t.Errorf("open.Run(\"%s\") threw an error: %s", input, err)
+		t.Errorf("fanopen.Run(\"%s\") threw an error: %s", input, err)
 	}
 
 	// should error
@@ -23,14 +23,14 @@ func TestStart(t *testing.T) {
 	input := "https://google.com/"
 	err := Start(input)
 	if err != nil {
-		t.Errorf("open.Start(\"%s\") threw an error: %s", input, err)
+		t.Errorf("fanopen.Start(\"%s\") threw an error: %s", input, err)
 	}
 
 	// shouldn't error
 	input = "xxxxxxxxxxxxxxx"
 	err = Start(input)
 	if err != nil {
-		t.Errorf("open.Start(\"%s\") shouldn't even fail on invalid input: %s", input, err)
+		t.Errorf("fanopen.Start(\"%s\") shouldn't even fail on invalid input: %s", input, err)
 	}
 }
 
@@ -40,7 +40,7 @@ func TestRunWith(t *testing.T) {
 	app := "firefox"
 	err := RunWith(input, app)
 	if err != nil {
-		t.Errorf("open.RunWith(\"%s\", \"%s\") threw an error: %s", input, app, err)
+		t.Errorf("fanopen.RunWith(\"%s\", \"%s\") threw an error: %s", input, app, err)
 	}
 
 	// should error
@@ -57,7 +57,7 @@ func TestStartWith(t *testing.T) {
 	app := "firefox"
 	err := StartWith(input, app)
 	if err != nil {
-		t.Errorf("open.StartWith(\"%s\", \"%s\") threw an error: %s", input, app, err)
+		t.Errorf("fanopen.StartWith(\"%s\", \"%s\") threw an error: %s", input, app, err)
 	}
 
 	// shouldn't error
@@ -73,7 +73,7 @@ func TestRunPath(t *testing.T) {
 	input := "D:/"
 	err := Start(input)
 	if err != nil {
-		t.Errorf("open.Start(\"%s\") threw an error: %s", input, err)
+		t.Errorf("fanopen.Start(\"%s\") threw an error: %s", input, err)
 	}
 }
 
@@ -81,6 +81,6 @@ func TestStartPath(t *testing.T) {
 	input := "D:/"
 	err := Start(input)
 	if err != nil {
-		t.Errorf("open.Start(\"%s\") threw an error: %s", input, err)
+		t.Errorf("fanopen.Start(\"%s\") threw an error: %s", input, err)
 	}
 }

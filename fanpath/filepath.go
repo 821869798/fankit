@@ -2,9 +2,11 @@ package fanpath
 
 import (
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -195,4 +197,47 @@ func CopyDir(srcDir, dstDir string) error {
 func GetFileNameWithoutExt(pathName string) string {
 	fileName := filepath.Base(pathName)
 	return strings.TrimSuffix(fileName, filepath.Ext(fileName))
+}
+
+func ReadDir(dirname string) ([]os.FileInfo, error) {
+	entries, err := os.ReadDir(dirname)
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]fs.FileInfo, 0, len(entries))
+	for _, entry := range entries {
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		infos = append(infos, info)
+	}
+	return infos, nil
+}
+
+// ByModTime 实现了sort.Interface，用于按修改时间排序文件。
+type byModTime []os.FileInfo
+
+func (a byModTime) Len() int           { return len(a) }
+func (a byModTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a byModTime) Less(i, j int) bool { return a[i].ModTime().Before(a[j].ModTime()) }
+
+// GetFileListByModTime 获取一个目录下的所有文件，并且按修改时间排序
+func GetFileListByModTime(dir string) ([]string, error) {
+	var fileLists []string
+	fileInfos, err := ReadDir(dir)
+	if err != nil {
+		return fileLists, err
+	}
+
+	sortFileInfos := byModTime(fileInfos)
+	sort.Sort(sortFileInfos)
+
+	for _, fileInfo := range fileInfos {
+		if fileInfo.IsDir() {
+			continue
+		}
+		fileLists = append(fileLists, filepath.Join(dir, fileInfo.Name()))
+	}
+	return fileLists, nil
 }

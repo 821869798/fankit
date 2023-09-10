@@ -1,15 +1,15 @@
 //go:build darwin
 
-package open
+package fanopen
 
 import (
 	"os/exec"
 )
 
 func open(input string) *exec.Cmd {
-	return exec.Command("open", input)
+	return exec.Command("fanopen", input)
 }
 
 func openWith(input string, appName string) *exec.Cmd {
-	return exec.Command("open", "-a", appName, input)
+	return exec.Command("fanopen", "-a", appName, input)
 }

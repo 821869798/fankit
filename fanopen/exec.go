@@ -1,6 +1,6 @@
 //go:build !windows && !darwin
 
-package open
+package fanopen
 
 import (
 	"os/exec"
@@ -10,7 +10,7 @@ import (
 // http://sources.debian.net/src/xdg-utils/1.1.0~rc1%2Bgit20111210-7.1/scripts/xdg-mime/
 
 func open(input string) *exec.Cmd {
-	return exec.Command("xdg-open", input)
+	return exec.Command("xdg-fanopen", input)
 }
 
 func openWith(input string, appName string) *exec.Cmd {
