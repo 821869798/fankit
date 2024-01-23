@@ -125,8 +125,12 @@ func InitDirAndClearFile(path string, removePattern string) error {
 			return err
 		}
 	}
-	err := filepath.Walk(path, func(fileName string, f os.FileInfo, err error) error {
-		if ok, _ := regexp.MatchString(removePattern, fileName); !ok {
+	reg, err := regexp.Compile(removePattern)
+	if err != nil {
+		return err
+	}
+	err = filepath.Walk(path, func(fileName string, f os.FileInfo, err error) error {
+		if ok := reg.MatchString(fileName); !ok {
 			return nil
 		}
 		err = os.Remove(fileName)
@@ -199,20 +203,20 @@ func GetFileNameWithoutExt(pathName string) string {
 	return strings.TrimSuffix(fileName, filepath.Ext(fileName))
 }
 
-func ReadDir(dirname string) ([]os.FileInfo, error) {
-	entries, err := os.ReadDir(dirname)
+func ReadDir(dirName string) ([]os.FileInfo, error) {
+	entries, err := os.ReadDir(dirName)
 	if err != nil {
 		return nil, err
 	}
-	infos := make([]fs.FileInfo, 0, len(entries))
+	infoList := make([]fs.FileInfo, 0, len(entries))
 	for _, entry := range entries {
 		info, err := entry.Info()
 		if err != nil {
 			return nil, err
 		}
-		infos = append(infos, info)
+		infoList = append(infoList, info)
 	}
-	return infos, nil
+	return infoList, nil
 }
 
 // ByModTime 实现了sort.Interface，用于按修改时间排序文件。
@@ -225,15 +229,15 @@ func (a byModTime) Less(i, j int) bool { return a[i].ModTime().Before(a[j].ModTi
 // GetFileListByModTime 获取一个目录下的所有文件，并且按修改时间排序
 func GetFileListByModTime(dir string) ([]string, error) {
 	var fileLists []string
-	fileInfos, err := ReadDir(dir)
+	fileInfoList, err := ReadDir(dir)
 	if err != nil {
 		return fileLists, err
 	}
 
-	sortFileInfos := byModTime(fileInfos)
-	sort.Sort(sortFileInfos)
+	sortFileInfo := byModTime(fileInfoList)
+	sort.Sort(sortFileInfo)
 
-	for _, fileInfo := range fileInfos {
+	for _, fileInfo := range fileInfoList {
 		if fileInfo.IsDir() {
 			continue
 		}
