@@ -1,5 +1,5 @@
 package fankit
 
 const (
-	Version = "0.0.8"
+	Version = "0.0.9"
 )
