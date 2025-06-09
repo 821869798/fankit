@@ -8,19 +8,17 @@ import (
 )
 
 // Helper function to create a temporary cache directory
-func setupTestCache[V any](t *testing.T, options ...Option[V]) (*FileCache[V], func()) {
+func setupTestCache(t *testing.T, options ...Option) (*FileCache, func()) {
 	t.Helper()
 	tmpDir, err := os.MkdirTemp("", "filecache_test_")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 
-	// Specify type V for default options
-	defaultOptions := []Option[V]{WithMaxItems[V](10), WithEvictPercent[V](0.3)}
+	defaultOptions := []Option{WithMaxItems(10), WithEvictPercent(0.3)}
 	allOptions := append(defaultOptions, options...)
 
-	// Specify type V for NewFileCache
-	fc, err := NewFileCache[V](tmpDir, allOptions...)
+	fc, err := NewFileCache(tmpDir, allOptions...)
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("NewFileCache failed: %v", err)
@@ -39,8 +37,7 @@ func TestFileCache_NewFileCache(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Specify a type for V, e.g., string, when calling NewFileCache
-	fc, err := NewFileCache[string](tmpDir)
+	fc, err := NewFileCache(tmpDir)
 	if err != nil {
 		t.Fatalf("NewFileCache() error = %v", err)
 	}
@@ -59,12 +56,11 @@ func TestFileCache_NewFileCache(t *testing.T) {
 }
 
 func TestFileCache_SetGetRemove(t *testing.T) {
-	// Specify a type for V, e.g., string, when calling setupTestCache
-	fc, cleanup := setupTestCache[string](t)
+	fc, cleanup := setupTestCache(t)
 	defer cleanup()
 
 	key := "testKey"
-	value := "testValue" // This will be of type string, matching V
+	value := "testValue"
 	duration := time.Minute
 
 	// Test Set
@@ -73,21 +69,21 @@ func TestFileCache_SetGetRemove(t *testing.T) {
 	}
 
 	// Test Get
-	// retrievedValue will be of type string (V)
-	retrievedValue, found, err := fc.Get(key)
+	var retrievedString string
+	found, err := fc.Get(key, &retrievedString)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
 	if !found {
 		t.Fatal("Get: key not found after Set")
 	}
-	// No type assertion needed as retrievedValue is already of type string
-	if retrievedValue != value {
-		t.Errorf("Get: expected value %s, got %s", value, retrievedValue)
+
+	if retrievedString != value {
+		t.Errorf("Get: expected value %s, got %s", value, retrievedString)
 	}
 
 	// Test Get non-existent key
-	_, found, err = fc.Get("nonExistentKey")
+	found, err = fc.Get("nonExistentKey", &retrievedString)
 	if err != nil {
 		t.Fatalf("Get non-existent key failed: %v", err)
 	}
@@ -101,7 +97,7 @@ func TestFileCache_SetGetRemove(t *testing.T) {
 	}
 
 	// Test Get after Remove
-	_, found, err = fc.Get(key)
+	found, err = fc.Get(key, &retrievedString)
 	if err != nil {
 		t.Fatalf("Get after Remove failed: %v", err)
 	}
@@ -116,12 +112,11 @@ func TestFileCache_SetGetRemove(t *testing.T) {
 }
 
 func TestFileCache_SetGetRemove_Bytes(t *testing.T) {
-	// Specify []byte as the type for V when calling setupTestCache
-	fc, cleanup := setupTestCache[[]byte](t)
+	fc, cleanup := setupTestCache(t)
 	defer cleanup()
 
 	key := "testKeyBytes"
-	value := []byte("testValueBytes") // This will be of type []byte
+	value := []byte("testValueBytes")
 	duration := time.Minute
 
 	// Test Set
@@ -130,20 +125,22 @@ func TestFileCache_SetGetRemove_Bytes(t *testing.T) {
 	}
 
 	// Test Get
-	retrievedValue, found, err := fc.Get(key)
+	var retrievedValue []byte // Declare a variable to store the retrieved bytes
+	found, err := fc.Get(key, &retrievedValue)
 	if err != nil {
 		t.Fatalf("Get (bytes) failed: %v", err)
 	}
 	if !found {
 		t.Fatal("Get (bytes): key not found after Set")
 	}
-	// Use bytes.Equal for comparing byte slices
+	// No type assertion needed as retrievedValue is already []byte if gob decoding is successful
 	if !bytes.Equal(retrievedValue, value) {
 		t.Errorf("Get (bytes): expected value %v, got %v", value, retrievedValue)
 	}
 
 	// Test Get non-existent key
-	_, found, err = fc.Get("nonExistentKeyBytes")
+	var nonExistentValue []byte // Declare a variable for the non-existent key
+	found, err = fc.Get("nonExistentKeyBytes", &nonExistentValue)
 	if err != nil {
 		t.Fatalf("Get (bytes) non-existent key failed: %v", err)
 	}
@@ -157,7 +154,8 @@ func TestFileCache_SetGetRemove_Bytes(t *testing.T) {
 	}
 
 	// Test Get after Remove
-	_, found, err = fc.Get(key)
+	var valueAfterRemove []byte // Declare a variable for the value after remove
+	found, err = fc.Get(key, &valueAfterRemove)
 	if err != nil {
 		t.Fatalf("Get (bytes) after Remove failed: %v", err)
 	}

@@ -34,7 +34,7 @@ type CacheHeader struct {
 }
 
 // FileCache 文件缓存结构
-type FileCache[V any] struct {
+type FileCache struct {
 	dir          string
 	maxItems     int
 	evictPercent float64
@@ -43,12 +43,12 @@ type FileCache[V any] struct {
 }
 
 // NewFileCache 创建新的文件缓存实例
-func NewFileCache[V any](cacheDir string, options ...Option[V]) (*FileCache[V], error) {
+func NewFileCache(cacheDir string, options ...Option) (*FileCache, error) {
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
 
-	fc := &FileCache[V]{
+	fc := &FileCache{
 		dir:          cacheDir,
 		maxItems:     DefaultMaxItems,
 		evictPercent: DefaultEvictPercent,
@@ -68,16 +68,16 @@ func NewFileCache[V any](cacheDir string, options ...Option[V]) (*FileCache[V], 
 }
 
 // Option 配置选项
-type Option[V any] func(*FileCache[V])
+type Option func(*FileCache)
 
-func WithMaxItems[V any](maxItems int) Option[V] {
-	return func(fc *FileCache[V]) {
+func WithMaxItems(maxItems int) Option {
+	return func(fc *FileCache) {
 		fc.maxItems = maxItems
 	}
 }
 
-func WithEvictPercent[V any](percent float64) Option[V] {
-	return func(fc *FileCache[V]) {
+func WithEvictPercent(percent float64) Option {
+	return func(fc *FileCache) {
 		if percent > 0 && percent < 1 {
 			fc.evictPercent = percent
 		}
@@ -85,7 +85,7 @@ func WithEvictPercent[V any](percent float64) Option[V] {
 }
 
 // scanCacheDir 扫描缓存目录，初始化keys
-func (fc *FileCache[V]) scanCacheDir() error {
+func (fc *FileCache) scanCacheDir() error {
 	entries, err := os.ReadDir(fc.dir)
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (fc *FileCache[V]) scanCacheDir() error {
 }
 
 // readCacheHeader 读取缓存文件头部
-func (fc *FileCache[V]) readCacheHeader(filePath string) (CacheHeader, error) {
+func (fc *FileCache) readCacheHeader(filePath string) (CacheHeader, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return CacheHeader{}, err
@@ -154,14 +154,14 @@ func (fc *FileCache[V]) readCacheHeader(filePath string) (CacheHeader, error) {
 }
 
 // cleanupFiles 批量清理文件
-func (fc *FileCache[V]) cleanupFiles(filePaths []string) {
+func (fc *FileCache) cleanupFiles(filePaths []string) {
 	for _, filePath := range filePaths {
 		os.Remove(filePath) // 忽略错误，因为文件可能已经不存在
 	}
 }
 
 // Set 设置缓存
-func (fc *FileCache[V]) Set(key string, value V, duration time.Duration) error {
+func (fc *FileCache) Set(key string, value interface{}, duration time.Duration) error {
 	if key == "" {
 		return errors.New("cache key cannot be empty")
 	}
@@ -204,7 +204,7 @@ func (fc *FileCache[V]) Set(key string, value V, duration time.Duration) error {
 }
 
 // writeToFile 写入数据到文件
-func (fc *FileCache[V]) writeToFile(filePath string, header CacheHeader, value V) error {
+func (fc *FileCache) writeToFile(filePath string, header CacheHeader, value interface{}) error {
 	file, err := os.Create(filePath)
 	if err != nil {
 		return err
@@ -224,10 +224,9 @@ func (fc *FileCache[V]) writeToFile(filePath string, header CacheHeader, value V
 }
 
 // Get 获取缓存
-func (fc *FileCache[V]) Get(key string) (V, bool, error) {
-	var zeroV V // V类型的零值
+func (fc *FileCache) Get(key string, value interface{}) (bool, error) {
 	if key == "" {
-		return zeroV, false, errors.New("cache key cannot be empty")
+		return false, errors.New("cache key cannot be empty")
 	}
 
 	fc.mu.RLock()
@@ -235,7 +234,7 @@ func (fc *FileCache[V]) Get(key string) (V, bool, error) {
 	fc.mu.RUnlock()
 
 	if !exists {
-		return zeroV, false, nil
+		return false, nil
 	}
 
 	now := time.Now().UnixNano()
@@ -247,10 +246,10 @@ func (fc *FileCache[V]) Get(key string) (V, bool, error) {
 			fc.removeUnsafe(key)
 		}
 		fc.mu.Unlock()
-		return zeroV, false, nil
+		return false, nil
 	}
 
-	data, err := fc.readFromFile(key, header)
+	err := fc.readFromFile(key, value)
 	if err != nil {
 		// 如果文件不存在，或文件已损坏，都应清理
 		isCorrupted := errors.Is(err, ErrCacheCorrupted) || errors.Is(err, ErrKeyMismatch)
@@ -262,21 +261,20 @@ func (fc *FileCache[V]) Get(key string) (V, bool, error) {
 			}
 			fc.mu.Unlock()
 		}
-		return zeroV, false, err // 返回V的零值和错误
+		return false, err // 返回interface{}的零值和错误
 	}
 
-	return data, true, nil
+	return true, nil
 }
 
 // readFromFile 从文件读取数据
-func (fc *FileCache[V]) readFromFile(key string, expectedHeader CacheHeader) (V, error) {
-	var data V // V类型的零值，用于错误返回或成功解码
+func (fc *FileCache) readFromFile(key string, value interface{}) error {
 	hashedKey := fc.getHash(key)
 	filePath := filepath.Join(fc.dir, hashedKey)
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		return data, err
+		return err
 	}
 	defer file.Close()
 
@@ -284,24 +282,24 @@ func (fc *FileCache[V]) readFromFile(key string, expectedHeader CacheHeader) (V,
 
 	var fileHeader CacheHeader
 	if err := decoder.Decode(&fileHeader); err != nil {
-		return data, fmt.Errorf("corrupted header: %w", err)
+		return fmt.Errorf("corrupted header: %w", err)
 	}
 
 	// 验证头部一致性
 	if fileHeader.Key != key {
-		return data, ErrKeyMismatch
+		return ErrKeyMismatch
 	}
 
-	// 解码数据到泛型变量data的地址
-	if err := decoder.Decode(&data); err != nil {
-		return data, fmt.Errorf("corrupted data: %w", err)
+	// 解码数据到interface{}变量data的地址
+	if err := decoder.Decode(value); err != nil {
+		return fmt.Errorf("corrupted data: %w", err)
 	}
 
-	return data, nil
+	return nil
 }
 
 // evictRandom 随机淘汰缓存项，适用于大数量缓存
-func (fc *FileCache[V]) evictRandom() error {
+func (fc *FileCache) evictRandom() error {
 	numToEvict := int(float64(len(fc.keys)) * fc.evictPercent)
 	if numToEvict == 0 && len(fc.keys) > 0 { // 确保至少淘汰一个（如果缓存不为空）
 		numToEvict = 1
@@ -340,7 +338,7 @@ func (fc *FileCache[V]) evictRandom() error {
 }
 
 // evictOldest 淘汰最旧的缓存项
-func (fc *FileCache[V]) evictOldest() error {
+func (fc *FileCache) evictOldest() error {
 	if len(fc.keys) == 0 {
 		return nil
 	}
@@ -373,7 +371,7 @@ func (fc *FileCache[V]) evictOldest() error {
 	return nil
 }
 
-func (fc *FileCache[V]) evictCache() error {
+func (fc *FileCache) evictCache() error {
 	if len(fc.keys) < fc.maxItems {
 		return nil
 	}
@@ -385,7 +383,7 @@ func (fc *FileCache[V]) evictCache() error {
 }
 
 // removeUnsafe 不加锁的删除方法（内部使用）
-func (fc *FileCache[V]) removeUnsafe(key string) error {
+func (fc *FileCache) removeUnsafe(key string) error {
 	hashedKey := fc.getHash(key)
 	filePath := filepath.Join(fc.dir, hashedKey)
 	delete(fc.keys, key)
@@ -397,7 +395,7 @@ func (fc *FileCache[V]) removeUnsafe(key string) error {
 }
 
 // CleanExpired 清理所有过期缓存
-func (fc *FileCache[V]) CleanExpired() error {
+func (fc *FileCache) CleanExpired() error {
 	fc.mu.Lock()
 	defer fc.mu.Unlock()
 
@@ -418,7 +416,7 @@ func (fc *FileCache[V]) CleanExpired() error {
 }
 
 // Remove 删除指定缓存
-func (fc *FileCache[V]) Remove(key string) error {
+func (fc *FileCache) Remove(key string) error {
 	fc.mu.Lock()
 	defer fc.mu.Unlock()
 
@@ -430,14 +428,14 @@ func (fc *FileCache[V]) Remove(key string) error {
 }
 
 // Size 获取当前缓存项数量
-func (fc *FileCache[V]) Size() int {
+func (fc *FileCache) Size() int {
 	fc.mu.RLock()
 	defer fc.mu.RUnlock()
 	return len(fc.keys)
 }
 
 // Clear 清空所有缓存
-func (fc *FileCache[V]) Clear() error {
+func (fc *FileCache) Clear() error {
 	fc.mu.Lock()
 	defer fc.mu.Unlock()
 
@@ -454,7 +452,7 @@ func (fc *FileCache[V]) Clear() error {
 }
 
 // getHash 生成键的哈希值
-func (fc *FileCache[V]) getHash(key string) string {
+func (fc *FileCache) getHash(key string) string {
 	hash := md5.Sum([]byte(key))
 	return hex.EncodeToString(hash[:])
 }
